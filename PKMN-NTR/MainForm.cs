@@ -123,72 +123,111 @@ namespace ntrbase
         public System.Windows.Forms.ToolTip ToolTipPSV = new System.Windows.Forms.ToolTip();
 
 
+        public void CreateFileWatcher(string path)
+        {
+            // Create a new FileSystemWatcher and set its properties.
+            FileSystemWatcher watcher = new FileSystemWatcher();
+            watcher.Path = path;
+            /* Watch for changes in LastAccess and LastWrite times, and 
+               the renaming of files or directories. */
+            watcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
+               | NotifyFilters.FileName | NotifyFilters.DirectoryName;
+            // Only watch text files.
+            watcher.Filter = "*.txt";
+
+            // Add event handlers.
+            watcher.Changed += new FileSystemEventHandler(OnChanged);
+            watcher.Created += new FileSystemEventHandler(OnChanged);
+            watcher.Deleted += new FileSystemEventHandler(OnChanged);
+
+            // Begin watching.
+            watcher.EnableRaisingEvents = true;
+        }
+
+        // Define the event handlers.
+        private void OnChanged(object source, FileSystemEventArgs e)
+        {
+            selectedclone = "C:\\Users\\snuggles08\\inpokemon.pkx";
+            string extension = Path.GetExtension(selectedclone);
+            if (extension == ".pk6" || extension == ".pkx")
+            {
+                isEncryptedFF = false;
+            }
+            if (extension == ".ek6" || extension == ".ekx")
+            {
+                isEncryptedFF = true;
+            }
+            byte[] ek6b = File.ReadAllBytes(selectedclone);
+            string ek6 = BitConverter.ToString(ek6b).Replace("-", ", 0x");
+            int ss = (Decimal.ToInt32(clonetoBoxFF.Value) * 30 - 30) + Decimal.ToInt32(clonetoSlotFF.Value) - 1;
+            int ssOff = MainForm.boff + (ss * 232);
+            string ssH = ssOff.ToString("X");
+            if (ek6.Length == 1556 || ek6.Length == 1388)
+            {
+                chooseCloneFF.Enabled = true;
+            }
+            else
+            {
+                MessageBox.Show("Please make sure you are using a valid EKX file.", "Incorrect File Size");
+                txtLog.Clear();
+            }
+            int ss = (Decimal.ToInt32(clonetoBoxFF.Value) * 30 - 30) + Decimal.ToInt32(clonetoSlotFF.Value) - 1;
+            int ssOff = boff + (ss * 232);
+            string ssH = ssOff.ToString("X");
+            byte[] ek6b = File.ReadAllBytes(selectedclone);
+            string ek6s = BitConverter.ToString(ek6b).Replace("-", ", 0x");
+
+            if (isEncryptedFF == true)
+            {
+                byte[] cloneshort = ek6b.Take(232).ToArray();
+                if (ek6s.Length == 1556 || ek6s.Length == 1388)
+                {
+                    int icloneAmount = (int)cloneAmountFF.Value * 232;
+                    byte[] clone = new byte[icloneAmount];
+                    for (int i = 0; i < cloneAmountFF.Value; i++)
+                    {
+                        cloneshort.CopyTo(clone, (i) * 232);
+                    }
+                    string ek6 = BitConverter.ToString(clone).Replace("-", ", 0x");
+                    string pokeek6 = "write(0x" + ssH + ", (0x" + ek6 + "), pid=" + pid + ")";
+                    runCmd(pokeek6);
+                    txtLog.Clear();
+                }
+                else
+                {
+                    MessageBox.Show("Please make sure you are using a valid EKX file.", "Incorrect File Size");
+                    txtLog.Clear();
+                }
+            }
+
+            if (isEncryptedFF == false)
+            {
+                byte[] cloneshort = PKHeX.encryptArray(ek6b.Take(232).ToArray());
+                if (ek6s.Length == 1556 || ek6s.Length == 1388)
+                {
+                    int icloneAmount = (int)cloneAmountFF.Value * 232;
+                    byte[] clone = new byte[icloneAmount];
+                    for (int i = 0; i < cloneAmountFF.Value; i++)
+                    {
+                        cloneshort.CopyTo(clone, (i) * 232);
+                    }
+                    ek6 = BitConverter.ToString(clone).Replace("-", ", 0x");
+                    string pokeek6 = "write(0x" + ssH + ", (0x" + ek6 + "), pid=" + pid + ")";
+                    runCmd(pokeek6);
+                    txtLog.Clear();
+                }
+                else
+                {
+                    MessageBox.Show("Please make sure you are using a valid PKX file.", "Incorrect File Size");
+                    txtLog.Clear();
+                }
+            }
+        }
+
         private void MainForm_Load(object sender, EventArgs e)
         {
             groupBox1.Size = new System.Drawing.Size(154, 74);
             groupBox1.Location = new System.Drawing.Point(744, 339);
-
-            if (PingHost("fadx.co.uk") == true)
-            {
-                string downloadURL = "";
-                Version newVersion = null;
-                string aboutUpdate = "";
-                string xmlUrl = "http://fadx.co.uk/PKMN-NTR/update.xml";
-                XmlTextReader reader = null;
-                try
-                {
-                    reader = new XmlTextReader(xmlUrl);
-                    reader.MoveToContent();
-                    string elementName = "";
-                    if ((reader.NodeType == XmlNodeType.Element) && (reader.Name == "appinfo"))
-                    {
-                        while (reader.Read())
-                        {
-                            if (reader.NodeType == XmlNodeType.Element)
-                            {
-                                elementName = reader.Name;
-                            }
-                            else
-                            {
-                                if ((reader.NodeType == XmlNodeType.Text) && (reader.HasValue))
-                                    switch (elementName)
-                                    {
-                                        case "version":
-                                            newVersion = new Version(reader.Value);
-                                            break;
-                                        case "url":
-                                            downloadURL = reader.Value;
-                                            break;
-                                        case "about":
-                                            aboutUpdate = reader.Value;
-                                            break;
-
-                                    }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                    Environment.Exit(1);
-                }
-                finally
-                {
-                    if (reader != null)
-                        reader.Close();
-                }
-                Version applicationVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                if (applicationVersion.CompareTo(newVersion) < 0)
-                {
-                    groupBox1.Size = new System.Drawing.Size(154, 97);
-                    groupBox1.Location = new System.Drawing.Point(744, 316);
-                    versionCheck.Visible = true;
-                }
-                else
-                {
-                }
-            }
 
             species.Items.AddRange(speciesList);
             ability.Items.AddRange(abilityList);
@@ -296,7 +335,7 @@ namespace ntrbase
                 medItem.Items.Add(t);
                 berItem.Items.Add(t);
             }
-            host.Text = Settings.Default.IP;
+            host.Text = "192.168.0.8";
             runCmd("import sys;sys.path.append('.\\python\\Lib')");
             runCmd("for n in [n for n in dir(nc) if not n.startswith('_')]: globals()[n] = getattr(nc,n)    ");
             runCmd("repr([n for n in dir(nc) if not n.startswith('_')])");
@@ -316,82 +355,6 @@ namespace ntrbase
 
             }
             return pingable;
-        }
-
-        public void UpdateCheck()
-        {
-
-            if (PingHost("fadx.co.uk") == true)
-            {
-                string downloadURL = "";
-                Version newVersion = null;
-                string aboutUpdate = "";
-                string xmlUrl = "http://fadx.co.uk/PKMN-NTR/update.xml";
-                XmlTextReader reader = null;
-                try
-                {
-                    reader = new XmlTextReader(xmlUrl);
-                    reader.MoveToContent();
-                    string elementName = "";
-                    if ((reader.NodeType == XmlNodeType.Element) && (reader.Name == "appinfo"))
-                    {
-                        while (reader.Read())
-                        {
-                            if (reader.NodeType == XmlNodeType.Element)
-                            {
-                                elementName = reader.Name;
-                            }
-                            else
-                            {
-                                if ((reader.NodeType == XmlNodeType.Text) && (reader.HasValue))
-                                    switch (elementName)
-                                    {
-                                        case "version":
-                                            newVersion = new Version(reader.Value);
-                                            break;
-                                        case "url":
-                                            downloadURL = reader.Value;
-                                            break;
-                                        case "about":
-                                            aboutUpdate = reader.Value;
-                                            break;
-
-                                    }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message);
-                    Environment.Exit(1);
-                }
-                finally
-                {
-                    if (reader != null)
-                        reader.Close();
-                }
-                Version applicationVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                if (applicationVersion.CompareTo(newVersion) < 0)
-                {
-                    string str = String.Format("Current Version: {0}.\nLatest Vesion: {1}. \n\nWhat's new: {2} ", applicationVersion, newVersion, aboutUpdate);
-                    if (DialogResult.No != MessageBox.Show(str + "\n\nDownload now?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question))
-                    {
-                        try
-                        {
-                            Process.Start(downloadURL);
-                        }
-                        catch { }
-                        return;
-                    }
-                    else
-                    {
-                    }
-                }
-                else
-                {
-                }
-            }
         }
 
         public static byte[] ReadToEnd(System.IO.Stream stream)
@@ -776,7 +739,7 @@ namespace ntrbase
                 randomPID.Enabled = true;
                 setShiny.Enabled = true;
                 radioBattleBox.Enabled = true;
-                Settings.Default.IP = host.Text;
+                Settings.Default.IP = "192.168.0.8";
                 Settings.Default.Save();
             }
         }
@@ -1112,7 +1075,10 @@ namespace ntrbase
                     decimal numofItemsdec = itemssplit[0].Length / (Decimal)8;
                     decimal numofItemsRounded = Math.Ceiling(numofItemsdec);
                     int numofMeds = Convert.ToInt32(numofItemsRounded);
-                    dataGridView4.Rows.Add(numofMeds);
+                    if (numofMeds > 0)
+                    {
+                        dataGridView4.Rows.Add(numofMeds);
+                    }
                     for (int i = 0; i < numofMeds; i++)
                     {
                         uint medsfinal = BitConverter.ToUInt16(meds, i * 4);
@@ -2080,9 +2046,9 @@ namespace ntrbase
         private void buttonConnect_Click(object sender, EventArgs e)
         {
             txtLog.Clear();
-            runCmd("connect('" + host.Text + "',8000)");
-            Delay.Add(connectCheck, 2);
-            Delay.Add(getGame, 3);
+            runCmd("connect('" + "192.168.0.8" + "',8000)");
+            Delay.Add(connectCheck, 5);
+            Delay.Add(getGame, 8);
         }
 
 
@@ -2964,8 +2930,8 @@ namespace ntrbase
             selectcloneDialog.InitialDirectory = path;
             if (selectcloneDialog.ShowDialog() == DialogResult.OK)
             {
-                selectedclone = selectcloneDialog.FileName;
-                string extension = Path.GetExtension(selectcloneDialog.FileName);
+                selectedclone = "C:\\Users\\snuggles08\\inpokemon.pkx";
+                string extension = Path.GetExtension(selectedclone);
                 if (extension == ".pk6" || extension == ".pkx")
                 {
                     isEncryptedFF = false;
@@ -3266,11 +3232,6 @@ namespace ntrbase
             {
                 pictureBox1.Image = Properties.Resources._24;
             }
-        }
-
-        private void versionCheck_Click(object sender, EventArgs e)
-        {
-            UpdateCheck();
         }
 
         private void radioParty_CheckedChanged_1(object sender, EventArgs e)
